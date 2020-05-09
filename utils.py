@@ -6,6 +6,10 @@ import torch
 from torch.autograd import Variable
 
 def chamfer_loss(x, y, ps=91):
+    """
+    Chamfer distance from shape x to shape y
+    ps = y.shape[-1]
+    """
     A = x.cuda()
     B = y.cuda()
     A = A.permute(0, 2, 1)
@@ -43,3 +47,36 @@ def visualize_npy(npy_3d_matrix, save_img_fpath='./img/npy_01.png', remove_ticks
 
     if save_img_fpath is not None:
         plt.savefig(save_img_fpath)
+
+        
+def print_model_metrics(total_loss, 
+                        same_corr_cnt, 
+                        same_incorr_cnt, 
+                        diff_corr_cnt, 
+                        diff_incorr_cnt,
+                        len_test_ds):
+    """
+    Prints Total loss, Total Accuracy
+    Precision, Recall, and f1 Score for both classes
+    """
+    
+    precision = same_corr_cnt / (same_corr_cnt+diff_incorr_cnt)
+    recall = same_corr_cnt / (same_corr_cnt+same_incorr_cnt)
+    print("------------------ Evaluation Report ------------------")
+    print(f"After {len_test_ds} test points")
+    print(f"Total Accuracy: {(same_corr_cnt+diff_corr_cnt)/(2*len_test_ds)}")
+    print(f"Total loss {total_loss}")
+    print()
+
+    print(f"Metrics for the same class:")
+    print(f"Precision: {precision}")
+    print(f"Recall: {recall}")
+    print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
+
+    precision = diff_corr_cnt / (diff_corr_cnt+same_incorr_cnt)
+    recall = diff_corr_cnt / (diff_corr_cnt+diff_incorr_cnt)
+    print()
+    print(f"Metrics for the diff class:")
+    print(f"Precision: {precision}")
+    print(f"Recall: {recall}")
+    print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
