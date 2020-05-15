@@ -1,3 +1,7 @@
+import random
+import numpy as np
+
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,9 +10,6 @@ import torch.backends.cudnn as cudnn
 
 from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
-
-import random
-import numpy as np
 
 
 class PointNetDS(Dataset):
@@ -46,6 +47,7 @@ class PointDriftDS(Dataset):
         for i in range(self.labels.max() + 1):
             same_idx.append(idx_arr[self.labels == i])
             diff_idx.append(idx_arr[self.labels != i])
+
         for i in range(data.shape[0]):
             same = same_idx[self.labels[i]]
             diff = diff_idx[self.labels[i]]
@@ -76,7 +78,7 @@ class EncodingDS(Dataset):
         self.same_cls = torch.zeros((len(self.PointDriftDS), latent_size))
         self.diff_cls = torch.zeros((len(self.PointDriftDS), latent_size))
 
-    def train_encodings(self, num_iterations=50, lr=0.01, l2_reg=False, batch_size=16):
+    def train_encodings(self, find_encoding, num_iterations=50, lr=0.01, l2_reg=False, batch_size=16):
         dl = DataLoader(self.PointDriftDS,
                         batch_size=batch_size, shuffle=False)
         i = 0

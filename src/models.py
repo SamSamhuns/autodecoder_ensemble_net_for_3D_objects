@@ -1,3 +1,4 @@
+# Torch
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -7,18 +8,15 @@ import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 
-import random
-import numpy as np
-
 
 class AutoDecoder(nn.Module):
     """
     AutoDecoder NN to learn point drift (latent encoding) between two 3D shapes
     """
 
-    def __init__(self,  encoding_dim=256, point_dim=3):
+    def __init__(self,  encoding_size=256, point_dim=3):
         super(AutoDecoder, self).__init__()
-        self.fc1 = nn.Conv1d(encoding_dim + point_dim, 128, 1)
+        self.fc1 = nn.Conv1d(encoding_size + point_dim, 128, 1)
         self.fc2 = nn.Conv1d(128, 64, 1)
         self.fc3 = nn.Conv1d(64, point_dim, 1)
 
@@ -32,7 +30,7 @@ class AutoDecoder(nn.Module):
         # Return the drift from obj X determined by the latent encoding
         return X + self.fc3(X_enc)
 
-
+    
 class EnsembleAutoDecoder(nn.Module):
     """
     Ingests the latent encoding of two 3D objects
@@ -40,7 +38,7 @@ class EnsembleAutoDecoder(nn.Module):
     Stacked Ensemble
     """
 
-    def __init__(self, adnet_list=ensemble_adnet, encoding_size=256, point_dim=3):
+    def __init__(self, adnet_list, encoding_size=256, point_dim=3):
         """
         if comp_net is a module, EnsembleCompNet creates num_ensemble*comp_net NN modules
         if comp_net is a list of modules, EnsembleCompNet iterates through comp_net to get the NN modules
@@ -87,7 +85,7 @@ class EnsembleCompNet(nn.Module):
     Stacked Ensemble
     """
 
-    def __init__(self, comp_net=CompNet, num_ensemble=5, encoding_dim=256, seed_val=SEED):
+    def __init__(self, comp_net=CompNet, num_ensemble=5, encoding_dim=256, seed_val=17*19, use_cuda=True):
         """
         if comp_net is a module, EnsembleCompNet creates num_ensemble*comp_net NN modules
         if comp_net is a list of modules, EnsembleCompNet iterates through comp_net to get the NN modules
