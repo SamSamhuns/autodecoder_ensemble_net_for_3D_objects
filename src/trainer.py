@@ -28,10 +28,12 @@ from sklearn.kernel_approximation import RBFSampler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 
+from sklearn.metrics import auc, roc_curve
+
 # custom imports
 from .datasets import PointDriftDS, EncodingDS, EncodingDS
 from .models import AutoDecoder, EnsembleAutoDecoder, CompNet, EnsembleCompNet
-from .utils import chamfer_loss, visualize_npy, print_model_metrics, HyperParameter, DirectorySetting
+from .utils import chamfer_loss, visualize_npy, plot_roc_curve, print_model_metrics, HyperParameter, DirectorySetting
 
 
 def find_encoding(X, y, autodecoder, encoding_iters=300,
@@ -147,6 +149,33 @@ def train_compnet(HP, DS, train_ds, test_ds=None, compnet=None, save_wt_fname='p
     return cpnet
 
 
+def get_compnet_y_test_and_y_score(cpnet, test_ds, batch_size=16):
+    """
+    Returns y_test, y_score given a NN compnet and the test encoding ds
+    """
+    cpnet.eval()
+    test_dl = DataLoader(test_ds, batch_size=batch_size,
+                         shuffle=False)
+
+    y_test, y_score = [], []
+    for batch_idx, (_, _, _, _, same_cls, diff_cls) in enumerate(test_dl):
+        same_cls, diff_cls = same_cls.cuda(), diff_cls.cuda()
+
+        same_pred = cpnet(same_cls).detach().cpu().numpy()
+        same_target = np.ones(same_pred.shape, dtype=np.float)
+        
+        y_test.extend(same_target)
+        y_score.extend(same_pred)
+
+        diff_pred = cpnet(diff_cls).detach().cpu().numpy()
+        diff_target = np.zeros(diff_pred.shape, dtype=np.float)
+        
+        y_test.extend(diff_target)
+        y_score.extend(diff_pred)
+        
+    return y_test, y_score
+
+
 def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
     cpnet.eval()
     test_dl = DataLoader(test_ds, batch_size=batch_size,
@@ -160,6 +189,7 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
     diff_corr_cnt = 0.0
     same_incorr_cnt = 0.0
     diff_incorr_cnt = 0.0
+
 
     for batch_idx, (x, y, z, idx, same_cls, diff_cls) in enumerate(test_dl):
         batch_cnt += 1
@@ -208,6 +238,11 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
     print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
+    
+    # Get AUC and plot ROC
+    y_true, y_score = get_y_test_and_y_score(cpnet, test_ds)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    plot_roc_curve(fp_rate, tp_rate, title='CompNet Receiver operating characteristic')
 
     return (same_total_loss, diff_total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -435,27 +470,14 @@ def eval_rand_forest(rand_forest_clf, test_ds, batch_size=16):
     diff_incorr_cnt = np.sum((y ^ 1) & y_pred)
 
     total_loss = log_loss(y, rand_forest_clf.predict_proba(X))
-
-    precision = same_corr_cnt / (same_corr_cnt+diff_incorr_cnt)
-    recall = same_corr_cnt / (same_corr_cnt+same_incorr_cnt)
-    print("------------------ Evaluation Report ------------------")
-    print(f"After {len(test_ds)} test points")
-    print(f"Total Accuracy: {(same_corr_cnt+diff_corr_cnt)/(2*len(test_ds))}")
-    print(f"Total loss {total_loss}")
-    print()
-
-    print(f"Metrics for the same class:")
-    print(f"Precision: {precision}")
-    print(f"Recall: {recall}")
-    print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
-
-    precision = diff_corr_cnt / (diff_corr_cnt+same_incorr_cnt)
-    recall = diff_corr_cnt / (diff_corr_cnt+diff_incorr_cnt)
-    print()
-    print(f"Metrics for the diff class:")
-    print(f"Precision: {precision}")
-    print(f"Recall: {recall}")
-    print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
+    
+    print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
+                        diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    
+    # Get AUC and plot ROC
+    y_true, y_score = y, rand_forest_clf.predict_proba(X)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    plot_roc_curve(fp_rate, tp_rate, title='Random Forest Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -537,6 +559,11 @@ def eval_log_regr(log_regr_clf, test_ds, batch_size=16):
 
     print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
                         diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    
+    # Get AUC and plot ROC
+    y_true, y_score = y, log_regr_clf.predict_proba(X)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    plot_roc_curve(fp_rate, tp_rate, title='Logistic Regression Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -620,6 +647,11 @@ def eval_gaussian_naive_bayes(gau_nb_clf, test_ds, batch_size=16):
 
     print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
                         diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    
+    # Get AUC and plot ROC
+    y_true, y_score = y, gau_nb_clf.predict_proba(X)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    plot_roc_curve(fp_rate, tp_rate, title='Naive Bayes Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -711,6 +743,11 @@ def eval_decision_trees(decision_trees_clf, test_ds, batch_size=16):
 
     print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
                         diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    
+    # Get AUC and plot ROC
+    y_true, y_score = y, decision_trees_clf.predict_proba(X)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    plot_roc_curve(fp_rate, tp_rate, title='Decision Trees Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,

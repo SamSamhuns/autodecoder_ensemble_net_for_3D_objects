@@ -4,6 +4,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+from sklearn.metrics import auc
+
 import torch
 from torch.autograd import Variable
 
@@ -39,24 +41,17 @@ class HyperParameter:
 class DirectorySetting:
 
     def __init__(self,
-                 DATA_DIR="./data",
-                 OUTPUT_DIR="./tranformed/",
                  AUTODECODER_TRAINED_WEIGHT_DIR="./autodecoder_trained_weights",
                  CLASSIFIER_TRAINED_WEIGHT_DIR="./classifier_trained_weights"):
 
         self.AUTODECODER_TRAINED_WEIGHT_DIR = AUTODECODER_TRAINED_WEIGHT_DIR
         self.CLASSIFIER_TRAINED_WEIGHT_DIR = CLASSIFIER_TRAINED_WEIGHT_DIR
-        self.OUTPUT_DIR = OUTPUT_DIR
-        self.DATA_DIR = DATA_DIR
 
         os.makedirs(self.AUTODECODER_TRAINED_WEIGHT_DIR, exist_ok=True)
         os.makedirs(self.CLASSIFIER_TRAINED_WEIGHT_DIR, exist_ok=True)
-        os.makedirs(self.OUTPUT_DIR, exist_ok=True)
 
     def __repr__(self):
-        return f"DATA_DIR: {self.DATA_DIR}\n" + \
-               f"OUTPUT_DIR: {self.OUTPUT_DIR}\n" + \
-               f"AUTODECODER_TRAINED_WEIGHT_DIR: {self.AUTODECODER_TRAINED_WEIGHT_DIR}\n" + \
+        return f"AUTODECODER_TRAINED_WEIGHT_DIR: {self.AUTODECODER_TRAINED_WEIGHT_DIR}\n" + \
                f"CLASSIFIER_TRAINED_WEIGHT_DIR: {self.CLASSIFIER_TRAINED_WEIGHT_DIR}\n"
 
 
@@ -108,7 +103,7 @@ def visualize_npy(npy_3d_matrix, save_img_fpath='./img/image.png', remove_ticks=
 
 def get_X_y_from_npy(data_src, shuffle_seed=None):
     """
-    Returns X, y from data_src directory
+    Returns X, y from data_src directory (Different files such as aeroplane.npy, chari.npy etc)
     y = label is automatically assigned based on filename
 
     Example:
@@ -144,6 +139,8 @@ def get_X_y_from_npy(data_src, shuffle_seed=None):
 
 def get_train_test_split_from_npy(data_src, test_split=0.1, shuffle_seed=None):
     """
+    Given data_src .npy file, returns 
+    
     Returns X_train, X_test, y_train, y_test
     if shuffle_seed is None, X and y will not be shuffled
     """
@@ -154,6 +151,28 @@ def get_train_test_split_from_npy(data_src, test_split=0.1, shuffle_seed=None):
     y_train, y_test = y[test_idx_end:], y[:test_idx_end]
 
     return X_train, X_test, y_train, y_test
+
+
+def plot_roc_curve(fp_rate, tp_rate, title='Receiver operating characteristic',
+                   figsize=(8, 6)):
+    """
+    fp_rate = False Positive Rate 
+    tp_rate = True Positive Rate
+    """
+    roc_auc = auc(fp_rate, tp_rate)
+
+    plt.figure(figsize=figsize)
+    plt.plot(fprate, tprate, color='darkorange',
+             lw=2, label='ROC curve (area = %0.3f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='green', lw=lw, linestyle='--')
+
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate', size=12)
+    plt.ylabel('True Positive Rate', size=12)
+    plt.title(title, size=15)
+    plt.legend(loc="lower right", fontsize=15)
+    plt.show()
 
 
 def print_model_metrics(total_loss,
