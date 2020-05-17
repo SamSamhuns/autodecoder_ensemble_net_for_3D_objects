@@ -78,7 +78,7 @@ def find_encoding(X, y, autodecoder, encoding_iters=300,
     return loss_num, encoding
 
 
-def train_compnet(HP, DS, train_ds, test_ds=None, compnet=None, save_wt_fname='pnet_compnet.pth'):
+def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fname='pnet_compnet.pth'):
     """
     Train the CompNet
 
@@ -140,8 +140,8 @@ def train_compnet(HP, DS, train_ds, test_ds=None, compnet=None, save_wt_fname='p
                 diff_total_loss = 0.0
         op_schedule.step(epoch)
 
-        if test_ds is not None and epoch % 5 == 0:
-            print("Eval: ", eval_compnet(cpnet, test_ds, batch_size=batch_size))
+        if print_eval and epoch % 5 == 0:
+            print("Training Set Eval: ", eval_compnet(cpnet, train_ds, batch_size=batch_size))
 
     if save_wt_fname is not None:
         torch.save(cpnet.module.state_dict(),
@@ -240,7 +240,7 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
     print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
     
     # Get AUC and plot ROC
-    y_true, y_score = get_y_test_and_y_score(cpnet, test_ds)
+    y_true, y_score = get_compnet_y_test_and_y_score(cpnet, test_ds)
     fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
     plot_roc_curve(fp_rate, tp_rate, title='CompNet Receiver operating characteristic')
 
@@ -250,7 +250,7 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
             batch_cnt, len(test_ds))
 
 
-def train_decoder(HP, DS, train_ds, test_ds=None, decoder=None, save_wt_fname='pnet_decoder.pth'):
+def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fname='pnet_decoder.pth'):
     """ 
     Default training is for 3D point dimensions
 
@@ -332,8 +332,8 @@ def train_decoder(HP, DS, train_ds, test_ds=None, decoder=None, save_wt_fname='p
                 diff_total_loss = 0.0
         op_schedule.step(epoch)
 
-        if test_ds is not None and epoch % 5 == 0:
-            print("Eval: ", eval_decoder(adnet, test_ds, batch_size=batch_size))
+        if print_eval and epoch % 5 == 0:
+            print("Training Set Eval: ", eval_decoder(adnet, train_ds, batch_size=batch_size))
 
     if save_wt_fname is not None:
         torch.save(adnet.module.state_dict(),
@@ -342,7 +342,7 @@ def train_decoder(HP, DS, train_ds, test_ds=None, decoder=None, save_wt_fname='p
 
 
 def return_decoder_train_test_encoding_ds(X_train, y_train, X_test, y_test,
-                                          adnet_HP, adnet_DS,
+                                          adnet_HP, adnet_DS, print_eval=False,
                                           autodecoder=AutoDecoder(encoding_size=256,
                                                                   point_dim=3),
                                           save_wt_fname='mnet_decoder.pth'):
@@ -361,8 +361,8 @@ def return_decoder_train_test_encoding_ds(X_train, y_train, X_test, y_test,
     mn_autodecoder = train_decoder(adnet_HP,
                                    adnet_DS,
                                    train_ds=train_ds,
-                                   test_ds=test_ds,
                                    decoder=autodecoder,
+                                   print_eval=print_eval,
                                    save_wt_fname=save_wt_fname)
 
     # get the train encodings
@@ -389,6 +389,24 @@ def eval_decoder(decoder, eval_ds, batch_size=16):
                                        num_iterations=10, lr=0.05, batch_size=batch_size)[2:]
 
 
+def get_X_y_from_dataloader(data_loader):
+    X, y = None, None
+    # Combine the entire dataset
+    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(data_loader):
+        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
+        same_target, diff_target = np.ones(
+            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
+
+        if X is None and y is None:
+            X = np.concatenate([same_cls, diff_cls], axis=0)
+            y = np.concatenate([same_target, diff_target], axis=0)
+        else:
+            X = np.concatenate([X, same_cls, diff_cls], axis=0)
+            y = np.concatenate([y, same_target, diff_target], axis=0)
+
+    return X,y
+
+
 def train_rand_forest(HP, DS, train_ds, save_wt_fname='pnet_rand_forest_clf.pkl', **kwargs):
     """
     Train the Random Forest model
@@ -407,19 +425,7 @@ def train_rand_forest(HP, DS, train_ds, save_wt_fname='pnet_rand_forest_clf.pkl'
 
     data_loader_train = DataLoader(train_ds, batch_size=16,
                                    shuffle=True)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(data_loader_train):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
-
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
+    X, y = get_X_y_from_dataloader(data_loader_train)
 
     rand_forest_clf = RandomForestClassifier(max_depth=max_depth,
                                              criterion=criterion,
@@ -440,27 +446,8 @@ def train_rand_forest(HP, DS, train_ds, save_wt_fname='pnet_rand_forest_clf.pkl'
 def eval_rand_forest(rand_forest_clf, test_ds, batch_size=16):
     test_dl = DataLoader(test_ds, batch_size=batch_size,
                          shuffle=False)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(test_dl):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
+    X, y = get_X_y_from_dataloader(test_dl)
 
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
-
-    """
-    Note:
-    rbf_feature reduces dimensions of training data
-    but also penalizes accuracy, precision and recall of model
-        rbf_feature = RBFSampler(gamma=1, random_state=1)
-        X = rbf_feature.fit_transform(X)
-    """
     y_pred = rand_forest_clf.predict(X)
     y, y_pred = y.astype(int), y_pred.astype(int)
 
@@ -476,7 +463,7 @@ def eval_rand_forest(rand_forest_clf, test_ds, batch_size=16):
     
     # Get AUC and plot ROC
     y_true, y_score = y, rand_forest_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
     plot_roc_curve(fp_rate, tp_rate, title='Random Forest Receiver operating characteristic')
 
     return (total_loss,
@@ -497,19 +484,7 @@ def train_log_regr(HP, DS, train_ds, save_wt_fname='pnet_log_regr_clf.pkl', **kw
     solver = HP.solver
     data_loader_train = DataLoader(train_ds, batch_size=16,
                                    shuffle=True)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(data_loader_train):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
-
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
+    X, y = get_X_y_from_dataloader(data_loader_train)
 
     lor_regr_clf = LogisticRegression(random_state=0, solver=solver)
 
@@ -526,27 +501,8 @@ def train_log_regr(HP, DS, train_ds, save_wt_fname='pnet_log_regr_clf.pkl', **kw
 def eval_log_regr(log_regr_clf, test_ds, batch_size=16):
     test_dl = DataLoader(test_ds, batch_size=batch_size,
                          shuffle=False)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(test_dl):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
+    X, y = get_X_y_from_dataloader(test_dl)
 
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
-
-    """
-    Note:
-    rbf_feature reduces dimensions of training data
-    but also penalizes accuracy, precision and recall of model
-        rbf_feature = RBFSampler(gamma=1, random_state=1)
-        X = rbf_feature.fit_transform(X)
-    """
     y_pred = log_regr_clf.predict(X)
     y, y_pred = y.astype(int), y_pred.astype(int)
 
@@ -562,7 +518,7 @@ def eval_log_regr(log_regr_clf, test_ds, batch_size=16):
     
     # Get AUC and plot ROC
     y_true, y_score = y, log_regr_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
     plot_roc_curve(fp_rate, tp_rate, title='Logistic Regression Receiver operating characteristic')
 
     return (total_loss,
@@ -584,19 +540,7 @@ def train_naive_bayes(HP, DS, train_ds, save_wt_fname='pnet_gaussian_naive_bayes
 
     data_loader_train = DataLoader(train_ds, batch_size=16,
                                    shuffle=True)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(data_loader_train):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
-
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
+    X, y = get_X_y_from_dataloader(data_loader_train)
 
     gau_nb_clf = GaussianNB()
 
@@ -614,27 +558,8 @@ def train_naive_bayes(HP, DS, train_ds, save_wt_fname='pnet_gaussian_naive_bayes
 def eval_gaussian_naive_bayes(gau_nb_clf, test_ds, batch_size=16):
     test_dl = DataLoader(test_ds, batch_size=batch_size,
                          shuffle=False)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(test_dl):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
+    X, y = get_X_y_from_dataloader(test_dl)
 
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
-
-    """
-    Note:
-    rbf_feature reduces dimensions of training data
-    but also penalizes accuracy, precision and recall of model
-        rbf_feature = RBFSampler(gamma=1, random_state=1)
-        X = rbf_feature.fit_transform(X)
-    """
     y_pred = gau_nb_clf.predict(X)
     y, y_pred = y.astype(int), y_pred.astype(int)
 
@@ -650,7 +575,7 @@ def eval_gaussian_naive_bayes(gau_nb_clf, test_ds, batch_size=16):
     
     # Get AUC and plot ROC
     y_true, y_score = y, gau_nb_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
     plot_roc_curve(fp_rate, tp_rate, title='Naive Bayes Receiver operating characteristic')
 
     return (total_loss,
@@ -675,24 +600,15 @@ def train_decision_trees(HP, DS, train_ds, save_wt_fname='pnet_decision_trees_cl
     criterion = HP.criterion
     min_samples_split = HP.min_samples_split
     max_features = HP.max_features
+    min_samples_leaf = HP.min_samples_leaf
+    
     data_loader_train = DataLoader(train_ds, batch_size=16,
                                    shuffle=True)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(data_loader_train):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
-
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
+    X, y = get_X_y_from_dataloader(data_loader_train)
 
     decision_trees_clf = tree.DecisionTreeClassifier(criterion=criterion,
                                                      min_samples_split=min_samples_split,
+                                                     min_samples_leaf=min_samples_leaf,
                                                      max_features=max_features,
                                                      **kwargs)
 
@@ -710,27 +626,8 @@ def train_decision_trees(HP, DS, train_ds, save_wt_fname='pnet_decision_trees_cl
 def eval_decision_trees(decision_trees_clf, test_ds, batch_size=16):
     test_dl = DataLoader(test_ds, batch_size=batch_size,
                          shuffle=False)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(test_dl):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
+    X, y = get_X_y_from_dataloader(test_dl)
 
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
-
-    """
-    Note:
-    rbf_feature reduces dimensions of training data
-    but also penalizes accuracy, precision and recall of model
-        rbf_feature = RBFSampler(gamma=1, random_state=1)
-        X = rbf_feature.fit_transform(X)
-    """
     y_pred = decision_trees_clf.predict(X)
     y, y_pred = y.astype(int), y_pred.astype(int)
 
@@ -746,7 +643,7 @@ def eval_decision_trees(decision_trees_clf, test_ds, batch_size=16):
     
     # Get AUC and plot ROC
     y_true, y_score = y, decision_trees_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
     plot_roc_curve(fp_rate, tp_rate, title='Decision Trees Receiver operating characteristic')
 
     return (total_loss,
@@ -765,19 +662,7 @@ def train_svm(HP, DS, train_ds, save_wt_fname='pnet_svm_clf.pkl'):
     batch_size = HP.batch_size
     data_loader_train = DataLoader(train_ds, batch_size=16,
                                    shuffle=True)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(data_loader_train):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
-
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
+    X, y = get_X_y_from_dataloader(data_loader_train)
 
     sgd_clf = SGDClassifier(loss='hinge', penalty='l2')
 
@@ -801,19 +686,7 @@ def train_svm(HP, DS, train_ds, save_wt_fname='pnet_svm_clf.pkl'):
 def eval_svm(svm_clf, test_ds, batch_size=16):
     test_dl = DataLoader(test_ds, batch_size=batch_size,
                          shuffle=False)
-    X, y = None, None
-    # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(test_dl):
-        same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
-
-        if X is None and y is None:
-            X = np.concatenate([same_cls, diff_cls], axis=0)
-            y = np.concatenate([same_target, diff_target], axis=0)
-        else:
-            X = np.concatenate([X, same_cls, diff_cls], axis=0)
-            y = np.concatenate([y, same_target, diff_target], axis=0)
+    X, y = get_X_y_from_dataloader(test_dl)
 
     """
     Note:

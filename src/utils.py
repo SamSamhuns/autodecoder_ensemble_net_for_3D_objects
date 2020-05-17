@@ -101,6 +101,19 @@ def visualize_npy(npy_3d_matrix, save_img_fpath='./img/image.png', remove_ticks=
         plt.savefig(save_img_fpath)
 
 
+def count_unique_labels(y):
+    """
+    Counts number of unique labels in y
+    y must be a np.ndarray
+    """
+    print(y.shape)
+    bcount = np.bincount(y.reshape(-1,))
+    non_zero_idx = np.nonzero(bcount)[0]
+
+    for label, count in zip(non_zero_idx, bcount[non_zero_idx]):
+        print(label, count)
+        
+
 def get_X_y_from_npy(data_src, shuffle_seed=None):
     """
     Returns X, y from data_src directory (Different files such as aeroplane.npy, chari.npy etc)
@@ -162,9 +175,9 @@ def plot_roc_curve(fp_rate, tp_rate, title='Receiver operating characteristic',
     roc_auc = auc(fp_rate, tp_rate)
 
     plt.figure(figsize=figsize)
-    plt.plot(fprate, tprate, color='darkorange',
+    plt.plot(fp_rate, tp_rate, color='darkorange',
              lw=2, label='ROC curve (area = %0.3f)' % roc_auc)
-    plt.plot([0, 1], [0, 1], color='green', lw=lw, linestyle='--')
+    plt.plot([0, 1], [0, 1], color='green', lw=2, linestyle='--')
 
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
