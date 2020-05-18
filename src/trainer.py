@@ -113,7 +113,7 @@ def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fnam
         same_total_loss = 0.0
         diff_total_loss = 0.0
         cpnet.train()
-        for batch_idx, (x, y, z, idx, same_cls, diff_cls) in enumerate(data_loader_train):
+        for batch_idx, (_x, _y, _z, idx, same_cls, diff_cls) in enumerate(data_loader_train):
             optimizer.zero_grad()
 
             same_cls, diff_cls = same_cls.cuda(), diff_cls.cuda()
@@ -138,7 +138,7 @@ def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fnam
                 print("Loss: ", same_total_loss / 100, diff_total_loss / 100)
                 same_total_loss = 0.0
                 diff_total_loss = 0.0
-        op_schedule.step(epoch)
+        op_schedule.step()
 
         if print_eval and epoch % 5 == 0:
             print("Training Set Eval: ", eval_compnet(cpnet, train_ds, batch_size=batch_size))
@@ -303,24 +303,24 @@ def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fnam
     data_loader_train = DataLoader(train_ds, batch_size=batch_size,
                                    shuffle=True)
 
-    for epoch in range(0, EPOCHS):
+    for epoch in range(EPOCHS):
         adnet.train()
         same_total_loss = 0.0
         diff_total_loss = 0.0
 
-        for batch_idx, (x, y, z, idx) in enumerate(data_loader_train):
+        for batch_idx, (x, same, diff, idx) in enumerate(data_loader_train):
             optimizer.zero_grad()
-            x, y, z = x.cuda(), y.cuda(), z.cuda()
-            x, y, z = (Variable(x).float(),
-                       Variable(y).float(),
-                       Variable(z).float())
-            y_pred = adnet(x, same_encoding(torch.LongTensor(idx)))
-            loss_cham = chamfer_loss(y, y_pred, ps=y.shape[-1])
+            x, same, diff = x.cuda(), same.cuda(), diff.cuda()
+            x, same, diff = (Variable(x).float(),
+                       Variable(same).float(),
+                       Variable(diff).float())
+            same_pred = adnet(x, same_encoding(torch.LongTensor(idx)))
+            loss_cham = chamfer_loss(same, same_pred, ps=same.shape[-1])
             same_total_loss += loss_cham.data.cpu().numpy()
             loss_cham.backward()
 
-            z_pred = adnet(x, diff_encoding(torch.LongTensor(idx)))
-            loss_cham = chamfer_loss(z, z_pred, ps=z.shape[-1])
+            diff_pred = adnet(x, diff_encoding(torch.LongTensor(idx)))
+            loss_cham = chamfer_loss(diff, diff_pred, ps=diff.shape[-1])
             diff_total_loss += loss_cham.data.cpu().numpy()
             loss_cham.backward()
 
@@ -330,7 +330,7 @@ def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fnam
                 print("Loss: ", same_total_loss / 100, diff_total_loss / 100)
                 same_total_loss = 0.0
                 diff_total_loss = 0.0
-        op_schedule.step(epoch)
+        op_schedule.step()
 
         if print_eval and epoch % 5 == 0:
             print("Training Set Eval: ", eval_decoder(adnet, train_ds, batch_size=batch_size))
