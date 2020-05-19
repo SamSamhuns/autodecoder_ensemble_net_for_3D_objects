@@ -87,13 +87,13 @@ class EncodingDS(Dataset):
         diff_cls_loss = 0.0
         self.autodecoder.eval()
 
-        for batch_idx, (x, y, z, idx) in enumerate(dl):
+        for batch_idx, (x, same, diff, idx) in enumerate(dl):
             j = i + len(idx)
-            loss, encoding = find_encoding(x, y, self.autodecoder, encoding_iters=num_iterations,
+            loss, encoding = find_encoding(x, same, self.autodecoder, encoding_iters=num_iterations,
                                            encoding_size=self.latent_size, lr=lr, l2_reg=l2_reg,)
             same_cls_loss += loss
             self.same_cls[i:j] = encoding
-            loss, encoding = find_encoding(x, z, self.autodecoder, encoding_iters=num_iterations,
+            loss, encoding = find_encoding(x, diff, self.autodecoder, encoding_iters=num_iterations,
                                            encoding_size=self.latent_size, lr=lr, l2_reg=l2_reg,)
             diff_cls_loss += loss
             self.diff_cls[i:j] = encoding

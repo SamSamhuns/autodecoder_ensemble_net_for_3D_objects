@@ -114,38 +114,18 @@ The Chamfer loss is easily differentiable for back-propagation and is robust to 
 
 ![](./img/Chamfer_loss.png)
 
-### Neural Network Hyper Parameters used
+### Neural Network Hyper Parameters
 
-AutoDecoder Training
+One of the main hyper-parameters, the encoding size for the latent vector is set to `256`.
 
-    -   Epochs: 4
-    -   Learning Rate: 0.001
-    -   Batch Size: 32
-    -   Latent Encoding space size: 256
-    -   ADAM Optimizer
-
-CompNet Training
-
-    -   Epochs: 20
-    -   Learning Rate: 0.001
-    -   Batch Size: 16
-    -   Latent Encoding space size: 256  
-    -   ADAM Optimizer
-
-CompNet Training (ModelNet40)
-
-    -   Epochs: 50
-    -   Learning Rate: 0.001
-    -   Batch Size: 16
-    -   Latent Encoding space size: 256  
-    -   ADAM Optimizer
+All other Neural Network Parameters are reported in the supplementary material.
 
 ### System used for Training and Testing
 
     -   CPU: Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz
     -   Architecture: 64 Bit
     -   RAM: 62 Gib System Memory
-    -   Graphics: 7979MiB GeForce RTX 2080
+    -   Graphics: 7979 MiB GeForce RTX 2080
 
 # PointNet Data Results
 
@@ -264,7 +244,7 @@ The training times for the different datasets also show that our method computes
 
 However, the efficacy of an ensemble AutoDecoder network was not observed for all datasets, especially for `PointNet7`, where the total accuracy and related metrics actually decreased.
 
-One of the reasons for this reduced accuracy for the Ensemble AutoDecoder Net could be the highly imbalanced nature of training set for the PointNet7 dataset.
+One of the reasons for this reduced accuracy for the Ensemble AutoDecoder Net could be the highly imbalanced nature of training set for the `PointNet7` dataset.
 
 <div align='center'>
   <img src='./img/pointnet7_counts.png' width=500 />

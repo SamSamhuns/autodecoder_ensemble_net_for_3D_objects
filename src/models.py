@@ -30,7 +30,7 @@ class AutoDecoder(nn.Module):
         # Return the drift from obj X determined by the latent encoding
         return X + self.fc3(X_enc)
 
-    
+
 class EnsembleAutoDecoder(nn.Module):
     """
     Ingests the latent encoding of two 3D objects
@@ -85,7 +85,7 @@ class EnsembleCompNet(nn.Module):
     Stacked Ensemble
     """
 
-    def __init__(self, comp_net=CompNet, num_ensemble=5, encoding_dim=256, seed_val=17*19, use_cuda=True):
+    def __init__(self, comp_net=CompNet, num_ensemble=5, encoding_dim=256, seed_val=17 * 19, use_cuda=True):
         """
         if comp_net is a module, EnsembleCompNet creates num_ensemble*comp_net NN modules
         if comp_net is a list of modules, EnsembleCompNet iterates through comp_net to get the NN modules

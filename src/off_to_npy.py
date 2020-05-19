@@ -50,8 +50,8 @@ def unload_off_to_npy(category_list, split='train', src_dir='./data/ModelNet10/'
     unload_off_to_npy(modelnet40_category_list, split='test', src_dir='./data/ModelNet40/', dump_npy_dir='./data/ModelNet40_test_npy/')
     """
     for category in category_list:
-        dump_npy_file = 'modelnet_'+category+'.npy'
-        npy_dump_file = Path(dump_npy_dir+dump_npy_file)
+        dump_npy_file = 'modelnet_' + category + '.npy'
+        npy_dump_file = Path(dump_npy_dir + dump_npy_file)
         if npy_dump_file.is_file():
             print(f"{dump_npy_dir+dump_npy_file} already exists. Skipping now")
             continue
@@ -77,9 +77,9 @@ def unload_off_to_npy(category_list, split='train', src_dir='./data/ModelNet10/'
                 if X is not None:
                     print(X.shape)
 
-        dump_npy_file = 'modelnet_'+category+'.npy'
+        dump_npy_file = 'modelnet_' + category + '.npy'
         if X is not None:
-            np.save(dump_npy_dir+dump_npy_file, X.numpy())
+            np.save(dump_npy_dir + dump_npy_file, X.numpy())
             print(
                 f"Dumped category {category} with shape {X.shape} under {dump_npy_dir} as {dump_npy_file}")
             return

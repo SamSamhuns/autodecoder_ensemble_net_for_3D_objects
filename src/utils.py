@@ -112,7 +112,7 @@ def count_unique_labels(y):
 
     for label, count in zip(non_zero_idx, bcount[non_zero_idx]):
         print(label, count)
-        
+
 
 def get_X_y_from_npy(data_src, shuffle_seed=None):
     """
@@ -152,14 +152,14 @@ def get_X_y_from_npy(data_src, shuffle_seed=None):
 
 def get_train_test_split_from_npy(data_src, test_split=0.1, shuffle_seed=None):
     """
-    Given data_src .npy file, returns 
-    
+    Given data_src .npy file, returns
+
     Returns X_train, X_test, y_train, y_test
     if shuffle_seed is None, X and y will not be shuffled
     """
     X, y = get_X_y_from_npy(data_src, shuffle_seed=shuffle_seed)
 
-    test_idx_end = int(X.shape[0]*0.1)
+    test_idx_end = int(X.shape[0] * 0.1)
     X_train, X_test = X[test_idx_end:], X[:test_idx_end]
     y_train, y_test = y[test_idx_end:], y[:test_idx_end]
 
@@ -169,7 +169,7 @@ def get_train_test_split_from_npy(data_src, test_split=0.1, shuffle_seed=None):
 def plot_roc_curve(fp_rate, tp_rate, title='Receiver operating characteristic',
                    figsize=(8, 6)):
     """
-    fp_rate = False Positive Rate 
+    fp_rate = False Positive Rate
     tp_rate = True Positive Rate
     """
     roc_auc = auc(fp_rate, tp_rate)
@@ -199,8 +199,8 @@ def print_model_metrics(total_loss,
     Precision, Recall, and f1 Score for both classes
     """
 
-    precision = same_corr_cnt / (same_corr_cnt+diff_incorr_cnt)
-    recall = same_corr_cnt / (same_corr_cnt+same_incorr_cnt)
+    precision = same_corr_cnt / (same_corr_cnt + diff_incorr_cnt)
+    recall = same_corr_cnt / (same_corr_cnt + same_incorr_cnt)
     print("------------------ Evaluation Report ------------------")
     print(f"After {len_test_ds} test points")
     print(f"Total Accuracy: {(same_corr_cnt+diff_corr_cnt)/(2*len_test_ds)}")
@@ -212,8 +212,8 @@ def print_model_metrics(total_loss,
     print(f"Recall: {recall}")
     print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
 
-    precision = diff_corr_cnt / (diff_corr_cnt+same_incorr_cnt)
-    recall = diff_corr_cnt / (diff_corr_cnt+diff_incorr_cnt)
+    precision = diff_corr_cnt / (diff_corr_cnt + same_incorr_cnt)
+    recall = diff_corr_cnt / (diff_corr_cnt + diff_incorr_cnt)
     print()
     print(f"Metrics for the diff class:")
     print(f"Precision: {precision}")

@@ -8,6 +8,16 @@
     plant, radio, range_hood, sink, stairs, stool, tent,
     toilet, tv_stand, vase, wardrobe, xbox
 
+## ModelNet training data counts
+
+<div align='center'>
+
+<img src='img/modelnet10_counts.png' width=500 />
+
+<img src='img/modelnet40_counts.png' width=500 />
+
+</div>
+
 ## System used for Training
 
 **NVIDIA-GPU Statistics**
@@ -61,3 +71,41 @@
               width: 64 bits
               clock: 33MHz
               configuration: driver=nvidia latency=0
+
+## Neural Network Training Hyper-parameters
+
+`PyTorch` and `Numpy` SEED Value used as `17*19`
+
+### Neural Network Hyper Parameters used
+
+AutoDecoder Training
+
+    -   Epochs: 4
+    -   Learning Rate: 0.001
+    -   Batch Size: 32
+    -   Latent Encoding space size: 256
+    -   ADAM Optimizer
+
+CompNet Training
+
+    -   Epochs: 20
+    -   Learning Rate: 0.001
+    -   Batch Size: 16
+    -   Latent Encoding space size: 256  
+    -   ADAM Optimizer
+
+CompNet Training (Only for ModelNet40)
+
+    -   Epochs: 50
+    -   Learning Rate: 0.001
+    -   Batch Size: 16
+    -   Latent Encoding space size: 256  
+    -   ADAM Optimizer
+
+Encoding Pair Training
+
+    -   Number of iterations: 15
+    -   Learning Rate: 0.05
+    -   Batch Size: 16
+    -   Latent Encoding space size: 256  
+    -   ADAM Optimizer

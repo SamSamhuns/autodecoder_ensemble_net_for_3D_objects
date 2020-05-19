@@ -113,7 +113,7 @@ def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fnam
         same_total_loss = 0.0
         diff_total_loss = 0.0
         cpnet.train()
-        for batch_idx, (_x, _y, _z, idx, same_cls, diff_cls) in enumerate(data_loader_train):
+        for batch_idx, (_, _, _, idx, same_cls, diff_cls) in enumerate(data_loader_train):
             optimizer.zero_grad()
 
             same_cls, diff_cls = same_cls.cuda(), diff_cls.cuda()
@@ -141,7 +141,8 @@ def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fnam
         op_schedule.step()
 
         if print_eval and epoch % 5 == 0:
-            print("Training Set Eval: ", eval_compnet(cpnet, train_ds, batch_size=batch_size))
+            print("Training Set Eval: ", eval_compnet(
+                cpnet, train_ds, batch_size=batch_size))
 
     if save_wt_fname is not None:
         torch.save(cpnet.module.state_dict(),
@@ -163,16 +164,16 @@ def get_compnet_y_test_and_y_score(cpnet, test_ds, batch_size=16):
 
         same_pred = cpnet(same_cls).detach().cpu().numpy()
         same_target = np.ones(same_pred.shape, dtype=np.float)
-        
+
         y_test.extend(same_target)
         y_score.extend(same_pred)
 
         diff_pred = cpnet(diff_cls).detach().cpu().numpy()
         diff_target = np.zeros(diff_pred.shape, dtype=np.float)
-        
+
         y_test.extend(diff_target)
         y_score.extend(diff_pred)
-        
+
     return y_test, y_score
 
 
@@ -189,7 +190,6 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
     diff_corr_cnt = 0.0
     same_incorr_cnt = 0.0
     diff_incorr_cnt = 0.0
-
 
     for batch_idx, (x, y, z, idx, same_cls, diff_cls) in enumerate(test_dl):
         batch_cnt += 1
@@ -215,9 +215,9 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
         diff_incorr_cnt += np.sum(diff_pred.detach().cpu().numpy()
                                   >= pred_threshold)
 
-    precision = same_corr_cnt / (same_corr_cnt+diff_incorr_cnt)
+    precision = same_corr_cnt / (same_corr_cnt + diff_incorr_cnt)
     # same_corr_cnt / len(test_ds)
-    recall = same_corr_cnt / (same_corr_cnt+same_incorr_cnt)
+    recall = same_corr_cnt / (same_corr_cnt + same_incorr_cnt)
     print("------------------ Evaluation Report ------------------")
     print(f"Total Accuracy: {(same_corr_cnt+diff_corr_cnt)/(2*len(test_ds))}")
     print(f"After {batch_cnt} batches and {len(test_ds)} test points")
@@ -229,20 +229,21 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
     print(f"Recall: {recall}")
     print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
 
-    precision = diff_corr_cnt / (diff_corr_cnt+same_incorr_cnt)
+    precision = diff_corr_cnt / (diff_corr_cnt + same_incorr_cnt)
     # diff_corr_cnt / len(test_ds)
-    recall = diff_corr_cnt / (diff_corr_cnt+diff_incorr_cnt)
+    recall = diff_corr_cnt / (diff_corr_cnt + diff_incorr_cnt)
     print()
     print(f"Metrics for the diff class:")
     print(f"Avg loss: {diff_total_loss / batch_cnt}")
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
     print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
-    
+
     # Get AUC and plot ROC
     y_true, y_score = get_compnet_y_test_and_y_score(cpnet, test_ds)
     fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
-    plot_roc_curve(fp_rate, tp_rate, title='CompNet Receiver operating characteristic')
+    plot_roc_curve(fp_rate, tp_rate,
+                   title='CompNet Receiver operating characteristic')
 
     return (same_total_loss, diff_total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -251,7 +252,7 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
 
 
 def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fname='pnet_decoder.pth'):
-    """ 
+    """
     Default training is for 3D point dimensions
 
     Suggested Settings
@@ -312,8 +313,8 @@ def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fnam
             optimizer.zero_grad()
             x, same, diff = x.cuda(), same.cuda(), diff.cuda()
             x, same, diff = (Variable(x).float(),
-                       Variable(same).float(),
-                       Variable(diff).float())
+                             Variable(same).float(),
+                             Variable(diff).float())
             same_pred = adnet(x, same_encoding(torch.LongTensor(idx)))
             loss_cham = chamfer_loss(same, same_pred, ps=same.shape[-1])
             same_total_loss += loss_cham.data.cpu().numpy()
@@ -333,7 +334,8 @@ def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fnam
         op_schedule.step()
 
         if print_eval and epoch % 5 == 0:
-            print("Training Set Eval: ", eval_decoder(adnet, train_ds, batch_size=batch_size))
+            print("Training Set Eval: ", eval_decoder(
+                adnet, train_ds, batch_size=batch_size))
 
     if save_wt_fname is not None:
         torch.save(adnet.module.state_dict(),
@@ -392,7 +394,7 @@ def eval_decoder(decoder, eval_ds, batch_size=16):
 def get_X_y_from_dataloader(data_loader):
     X, y = None, None
     # Combine the entire dataset
-    for batch_idx, (_x, _y, _z, _idx, same_cls, diff_cls) in enumerate(data_loader):
+    for batch_idx, (_, _, _, _idx, same_cls, diff_cls) in enumerate(data_loader):
         same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
         same_target, diff_target = np.ones(
             same_cls.shape[0]), np.zeros(diff_cls.shape[0])
@@ -404,7 +406,7 @@ def get_X_y_from_dataloader(data_loader):
             X = np.concatenate([X, same_cls, diff_cls], axis=0)
             y = np.concatenate([y, same_target, diff_target], axis=0)
 
-    return X,y
+    return X, y
 
 
 def train_rand_forest(HP, DS, train_ds, save_wt_fname='pnet_rand_forest_clf.pkl', **kwargs):
@@ -438,7 +440,7 @@ def train_rand_forest(HP, DS, train_ds, save_wt_fname='pnet_rand_forest_clf.pkl'
 
     print(f"Total Log Loss: {log_loss(y, rand_forest_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(rand_forest_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR+'/'+save_wt_fname,
+        _ = joblib.dump(rand_forest_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
                         compress=9)
     return rand_forest_clf
 
@@ -457,14 +459,15 @@ def eval_rand_forest(rand_forest_clf, test_ds, batch_size=16):
     diff_incorr_cnt = np.sum((y ^ 1) & y_pred)
 
     total_loss = log_loss(y, rand_forest_clf.predict_proba(X))
-    
+
     print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
                         diff_corr_cnt, diff_incorr_cnt, len(test_ds))
-    
+
     # Get AUC and plot ROC
     y_true, y_score = y, rand_forest_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
-    plot_roc_curve(fp_rate, tp_rate, title='Random Forest Receiver operating characteristic')
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
+    plot_roc_curve(fp_rate, tp_rate,
+                   title='Random Forest Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -493,7 +496,7 @@ def train_log_regr(HP, DS, train_ds, save_wt_fname='pnet_log_regr_clf.pkl', **kw
 
     print(f"Total Log Loss: {log_loss(y, lor_regr_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(lor_regr_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR+'/'+save_wt_fname,
+        _ = joblib.dump(lor_regr_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
                         compress=9)
     return lor_regr_clf
 
@@ -515,11 +518,12 @@ def eval_log_regr(log_regr_clf, test_ds, batch_size=16):
 
     print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
                         diff_corr_cnt, diff_incorr_cnt, len(test_ds))
-    
+
     # Get AUC and plot ROC
     y_true, y_score = y, log_regr_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
-    plot_roc_curve(fp_rate, tp_rate, title='Logistic Regression Receiver operating characteristic')
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
+    plot_roc_curve(
+        fp_rate, tp_rate, title='Logistic Regression Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -550,7 +554,7 @@ def train_naive_bayes(HP, DS, train_ds, save_wt_fname='pnet_gaussian_naive_bayes
     print(
         f"Total Loss: {log_loss(y, gau_nb_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(gau_nb_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR+'/'+save_wt_fname,
+        _ = joblib.dump(gau_nb_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
                         compress=9)
     return gau_nb_clf
 
@@ -572,11 +576,12 @@ def eval_gaussian_naive_bayes(gau_nb_clf, test_ds, batch_size=16):
 
     print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
                         diff_corr_cnt, diff_incorr_cnt, len(test_ds))
-    
+
     # Get AUC and plot ROC
     y_true, y_score = y, gau_nb_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
-    plot_roc_curve(fp_rate, tp_rate, title='Naive Bayes Receiver operating characteristic')
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
+    plot_roc_curve(fp_rate, tp_rate,
+                   title='Naive Bayes Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -592,7 +597,7 @@ def train_decision_trees(HP, DS, train_ds, save_wt_fname='pnet_decision_trees_cl
 
     Suggested Parameters
     HP.criterion='entropy'
-    HP.min_samples_split = 5 
+    HP.min_samples_split = 5
     HP.max_features='auto' # sqrt(n_features) considered when splitting
     HP.batch_size=16
     """
@@ -601,7 +606,7 @@ def train_decision_trees(HP, DS, train_ds, save_wt_fname='pnet_decision_trees_cl
     min_samples_split = HP.min_samples_split
     max_features = HP.max_features
     min_samples_leaf = HP.min_samples_leaf
-    
+
     data_loader_train = DataLoader(train_ds, batch_size=16,
                                    shuffle=True)
     X, y = get_X_y_from_dataloader(data_loader_train)
@@ -618,7 +623,7 @@ def train_decision_trees(HP, DS, train_ds, save_wt_fname='pnet_decision_trees_cl
     print(
         f"Total Log Loss: {log_loss(y, decision_trees_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(decision_trees_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR+'/'+save_wt_fname,
+        _ = joblib.dump(decision_trees_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
                         compress=9)
     return decision_trees_clf
 
@@ -640,11 +645,12 @@ def eval_decision_trees(decision_trees_clf, test_ds, batch_size=16):
 
     print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
                         diff_corr_cnt, diff_incorr_cnt, len(test_ds))
-    
+
     # Get AUC and plot ROC
     y_true, y_score = y, decision_trees_clf.predict_proba(X)
-    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:,1])
-    plot_roc_curve(fp_rate, tp_rate, title='Decision Trees Receiver operating characteristic')
+    fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
+    plot_roc_curve(fp_rate, tp_rate,
+                   title='Decision Trees Receiver operating characteristic')
 
     return (total_loss,
             same_corr_cnt, diff_corr_cnt,
@@ -678,7 +684,7 @@ def train_svm(HP, DS, train_ds, save_wt_fname='pnet_svm_clf.pkl'):
 
     print(f"Total Hinge Loss: {hinge_loss(y, y_pred)}")
     if save_wt_fname is not None:
-        _ = joblib.dump(sgd_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR+'/'+save_wt_fname,
+        _ = joblib.dump(sgd_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
                         compress=9)
     return sgd_clf
 
