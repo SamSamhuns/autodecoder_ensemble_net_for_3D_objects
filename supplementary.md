@@ -8,9 +8,11 @@
     plant, radio, range_hood, sink, stairs, stool, tent,
     toilet, tv_stand, vase, wardrobe, xbox
 
-## ModelNet training data counts
+## Train set class data distribution
 
 <div align='center'>
+
+<img src='img/pointnet7_counts.png' width=500 />
 
 <img src='img/modelnet10_counts.png' width=500 />
 
@@ -31,16 +33,6 @@
     |   0  GeForce RTX 2080    Off  | 00000000:01:00.0  On |                  N/A |
     | N/A   40C    P8     9W /  N/A |    185MiB /  7979MiB |      0%      Default |
     +-------------------------------+----------------------+----------------------+
-
-    +-----------------------------------------------------------------------------+
-    | Processes:                                                       GPU Memory |
-    |  GPU       PID   Type   Process name                             Usage      |
-    |=============================================================================|
-    |    0      1545      G   /usr/lib/xorg/Xorg                            18MiB |
-    |    0      1580      G   /usr/bin/gnome-shell                          17MiB |
-    |    0      4024      G   /usr/lib/xorg/Xorg                            72MiB |
-    |    0      4155      G   /usr/bin/gnome-shell                          74MiB |
-    +-----------------------------------------------------------------------------+
 
 **Computer Statistics:**
 
@@ -109,3 +101,29 @@ Encoding Pair Training
     -   Batch Size: 16
     -   Latent Encoding space size: 256  
     -   ADAM Optimizer
+
+## Ensemble AutoDecoder CompNet ROC-AUC Results
+
+<div align='center'>
+
+### ROC Curves from the benchmarked classification models
+
+<img src='img/roc_auc/aggregated/pnet7_6m_roc.png' width=500 />
+
+### ROC Curves from the Similarity Classification on PointNet7
+
+<img src='img/roc_auc/aggregated/pnet7_roc.png' width=500 />
+
+### ROC Curves from the Similarity Classification on PointNet Full
+
+<img src='img/roc_auc/aggregated/fpnet_roc.png' width=500 />
+
+### ROC Curves from the Similarity Classification on ModelNet10
+
+<img src='img/roc_auc/aggregated/mnet10_roc.png' width=500 />
+
+### ROC Curves from the Similarity Classification on ModelNet40
+
+<img src='img/roc_auc/aggregated/mnet40_roc.png' width=500 />
+
+</div>

@@ -236,7 +236,7 @@ AutoDecoder Training time was `11m 45s`; Single CompNet and Ensemble CompNet tra
 
 ## Conclusion
 
-In the general, no matter whether the AutoDecoder has a single Neural Network or an ensemble Neural Network, the ensemble Comparison Nets (CompNets) always outperform all the Single CompNets in classification tasks for the same and different class. In general there is an average improvement of 10% in accuracy when switching to an ensemble classifier network for all of the different datasets that were used.
+In general, no matter whether the AutoDecoder has a single Neural Network or an ensemble Neural Network, the ensemble Comparison Nets (CompNets) always outperform all the Single CompNets in classification tasks for the same and different class. In general there is an average improvement of 10% in accuracy when switching to an ensemble classifier network for all of the different datasets that were used.
 
 We also show that our neural network classification models (Single and Ensemble CompNets) always outperform all other classical supervised machine learning models in accuracy, f1-scores and Receiving Operator Characteristic Area Under Curve (ROC-AUC) for the 3D object classification task (See Table 1).
 
