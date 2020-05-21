@@ -144,10 +144,10 @@ All other Neural Network Parameters are reported in the supplementary material.
 
 ### ROC Curves from the Similarity Classification on PointNet7
 
-| Single CompNet ![](./img/roc_auc/roc_auc_single_compnet_pnet7.png) |     Ensemble CompNet ![](./img/roc_auc/roc_auc_ensemble_compnet_pnet7.png)    |
-| :----------------------------------------------------------------: | :---------------------------------------------------------------------------: |
-|   **Logistic Regr** ![](./img/roc_auc/roc_auc_log_regr_pnet7.png)  |        **Naive Bayes** ![](./img/roc_auc/roc_auc_naive_bayes_pnet7.png)       |
-|  **Decision Trees** ![](./img/roc_auc/roc_auc_dec_tree_pnet7.png)  | **Random Forest Classifier** ![](./img/roc_auc/roc_auc_rand_forest_pnet7.png) |
+| <div align='center'>Single CompNet</div> ![](./img/roc_auc/roc_auc_single_compnet_pnet7.png) | <div align='center'>Ensemble CompNet</div> ![](./img/roc_auc/roc_auc_ensemble_compnet_pnet7.png) |
+| :------------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------------------------: |
+|                **Logistic Regr** ![](./img/roc_auc/roc_auc_log_regr_pnet7.png)               |                 **Naive Bayes** ![](./img/roc_auc/roc_auc_naive_bayes_pnet7.png)                 |
+|               **Decision Trees** ![](./img/roc_auc/roc_auc_dec_tree_pnet7.png)               |           **Random Forest Classifier** ![](./img/roc_auc/roc_auc_rand_forest_pnet7.png)          |
 
 **Figure 1: ROC Curves for the different models on the Classification PointNet7 task**
 
@@ -275,26 +275,4 @@ The `geotnf` package and `LoaderFish.py` files are based on implementations from
 
 ## References
 
--   Non-Rigid Point Set Registration Networks, Lingjing Wang, Jianchun Chen, Xiang Li, and Yi Fang, <https://arxiv.org/pdf/1904.01428.pdf>
-
--   X. Chenhao, "EPDNet: Encoder-less 3D Shape Descriptor Extraction", 2020, NYUAD Capstone Seminar
-
--   Z. Wu, S. Song, A. Khosla, F. Yu, L. Zhang, X. Tang and J. Xiao 3D ShapeNets: A Deep Representation for Volumetric Shapes Proceedings of 28th IEEE Conference on Computer Vision and Pattern Recognition (CVPR2015). <https://3dshapenets.cs.princeton.edu/paper.pdf>
-
--   Park, Jeong Joon et al. “DeepSDF: Learning Continuous Signed Distance Functions for Shape Representation.” 2019 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2019): 165-174.
-
--   Bojanowski, Piotr et al. “Optimizing the Latent Space of Generative Networks.” ICML (2018).
-
--   Wang, Lingjing et al. “Non-Rigid Point Set Registration Networks.” ArXiv abs/1904.01428 (2019): n. Pag.
-
--   Qi, Charles Ruizhongtai et al. “PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation.” 2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (2017): 77-85.
-
--   Rostami, R., Bashiri, F.S., Rostami, B. and Yu, Z. (2019), A Survey on Data‐Driven 3D Shape Descriptors. Computer Graphics Forum, 38: 356-393. doi:10.1111/cgf.13536
-
--   E. TaSci and A. Ugur, "Image classification using ensemble algorithms with deep learning and hand-crafted features," 2018 26th Signal Processing and Communications Applications Conference (SIU), Izmir, 2018, pp. 1-4, doi: 10.1109/SIU.2018.8404179.
-
--   Wolpert, David H. “Stacked Generalization.” Neural Networks 5, no. 2 (January 1992): 241–59. <https://doi.org/10.1016/S0893-6080(05)80023-1>.
-
--   Xie, Jingjing et al. “Horizontal and Vertical Ensemble with Deep Representation for Classification.” ArXiv abs/1306.2759 (2013): n. pag.
-
--   Nahas, Mohammed & Hussein, Mahmoud & Keshk, Arabi. (2019). Artificial Neural Network as Ensemble Technique Fuser for Improving Classification Accuracy. 174-179. 10.1109/ICICIS46948.2019.9014791.
+All References have been mentionned in the `References` section in `Ensemble AutoDecoder CompNets for 3D Point Cloud Pair Encoding and Classification.pdf`
