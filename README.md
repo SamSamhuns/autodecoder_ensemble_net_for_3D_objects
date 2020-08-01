@@ -112,7 +112,7 @@ We minimize the symmetric chamfer loss between point cloud pairs of the same cla
 
 The Chamfer loss is easily differentiable for back-propagation and is robust to outliers in the point cloud.
 
-![](./img/Chamfer_loss.png)
+![](./img/chamfer_loss.png)
 
 ### Neural Network Hyper Parameters
 
