@@ -3,12 +3,7 @@ import numpy as np
 
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
 
-from torch.autograd import Variable
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -78,9 +73,10 @@ class EncodingDS(Dataset):
         self.same_cls = torch.zeros((len(self.PointDriftDS), latent_size))
         self.diff_cls = torch.zeros((len(self.PointDriftDS), latent_size))
 
-    def train_encodings(self, find_encoding, num_iterations=50, lr=0.01, l2_reg=False, batch_size=16):
-        dl = DataLoader(self.PointDriftDS,
-                        batch_size=batch_size, shuffle=False)
+    def train_encodings(
+        self, find_encoding, num_iterations=50, lr=0.01, l2_reg=False, batch_size=16
+    ):
+        dl = DataLoader(self.PointDriftDS, batch_size=batch_size, shuffle=False)
         i = 0
         batch_cnt = 0
         same_cls_loss = 0.0
@@ -89,19 +85,38 @@ class EncodingDS(Dataset):
 
         for batch_idx, (x, same, diff, idx) in enumerate(dl):
             j = i + len(idx)
-            loss, encoding = find_encoding(x, same, self.autodecoder, encoding_iters=num_iterations,
-                                           encoding_size=self.latent_size, lr=lr, l2_reg=l2_reg,)
+            loss, encoding = find_encoding(
+                x,
+                same,
+                self.autodecoder,
+                encoding_iters=num_iterations,
+                encoding_size=self.latent_size,
+                lr=lr,
+                l2_reg=l2_reg,
+            )
             same_cls_loss += loss
             self.same_cls[i:j] = encoding
-            loss, encoding = find_encoding(x, diff, self.autodecoder, encoding_iters=num_iterations,
-                                           encoding_size=self.latent_size, lr=lr, l2_reg=l2_reg,)
+            loss, encoding = find_encoding(
+                x,
+                diff,
+                self.autodecoder,
+                encoding_iters=num_iterations,
+                encoding_size=self.latent_size,
+                lr=lr,
+                l2_reg=l2_reg,
+            )
             diff_cls_loss += loss
             self.diff_cls[i:j] = encoding
 
             i = j
             batch_cnt += 1
         print("Encodings trained")
-        return (self.same_cls, self.diff_cls, same_cls_loss / batch_cnt, diff_cls_loss / batch_cnt)
+        return (
+            self.same_cls,
+            self.diff_cls,
+            same_cls_loss / batch_cnt,
+            diff_cls_loss / batch_cnt,
+        )
 
     def __len__(self):
         return len(self.PointDriftDS)

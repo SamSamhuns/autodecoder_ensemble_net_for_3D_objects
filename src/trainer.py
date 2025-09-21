@@ -1,22 +1,14 @@
 # General
-import os
-import sys
-import time
 import math
-import tqdm
-import random
 import numpy as np
-import matplotlib.pylab as plt
 
 # Torch
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
 
 from torch.autograd import Variable
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 # sklearn
 import joblib
@@ -24,36 +16,41 @@ from sklearn import tree
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import hinge_loss, log_loss
-from sklearn.kernel_approximation import RBFSampler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 
-from sklearn.metrics import auc, roc_curve
+from sklearn.metrics import roc_curve
 
 # custom imports
-from .datasets import PointDriftDS, EncodingDS, EncodingDS
-from .models import AutoDecoder, EnsembleAutoDecoder, CompNet, EnsembleCompNet
-from .utils import chamfer_loss, visualize_npy, plot_roc_curve, print_model_metrics, HyperParameter, DirectorySetting
+from .datasets import PointDriftDS, EncodingDS
+from .models import AutoDecoder, CompNet
+from .utils import (
+    chamfer_loss,
+    plot_roc_curve,
+    print_model_metrics,
+)
 
 
-def find_encoding(X, y, autodecoder, encoding_iters=300,
-                  encoding_size=256, lr=5e-4, l2_reg=False):
+def find_encoding(
+    X, y, autodecoder, encoding_iters=300, encoding_size=256, lr=5e-4, l2_reg=False
+):
     """
     Generate the encoding (latent vector) for each data in X
     """
 
     def _adjust_lr(initial_lr, optimizer, num_iters, decreased_by, adjust_lr_every):
-
-        lr = initial_lr * ((1 / decreased_by) **
-                           (num_iters // adjust_lr_every))
+        lr = initial_lr * ((1 / decreased_by) ** (num_iters // adjust_lr_every))
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
     decreased_by = 10
     adjust_lr_every = encoding_iters // 2
 
-    encoding = torch.ones(X.shape[0], encoding_size).normal_(
-        mean=0, std=1.0 / math.sqrt(encoding_size)).cuda()
+    encoding = (
+        torch.ones(X.shape[0], encoding_size)
+        .normal_(mean=0, std=1.0 / math.sqrt(encoding_size))
+        .cuda()
+    )
 
     encoding.requires_grad = True
     optimizer = torch.optim.Adam([encoding], lr=lr)
@@ -78,7 +75,9 @@ def find_encoding(X, y, autodecoder, encoding_iters=300,
     return loss_num, encoding
 
 
-def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fname='pnet_compnet.pth'):
+def train_compnet(
+    HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fname="pnet_compnet.pth"
+):
     """
     Train the CompNet
 
@@ -105,20 +104,20 @@ def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fnam
     cpnet = nn.DataParallel(cpnet)
     cpnet.cuda()
 
-    data_loader_train = DataLoader(train_ds, batch_size=batch_size,
-                                   shuffle=True)
+    data_loader_train = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     loss_fn = nn.BCELoss()
     for epoch in range(EPOCHS):
         same_total_loss = 0.0
         diff_total_loss = 0.0
         cpnet.train()
-        for batch_idx, (_, _, _, idx, same_cls, diff_cls) in enumerate(data_loader_train):
+        for batch_idx, (_, _, _, idx, same_cls, diff_cls) in enumerate(
+            data_loader_train
+        ):
             optimizer.zero_grad()
 
             same_cls, diff_cls = same_cls.cuda(), diff_cls.cuda()
-            same_cls, diff_cls = Variable(
-                same_cls).float(), Variable(diff_cls).float()
+            same_cls, diff_cls = Variable(same_cls).float(), Variable(diff_cls).float()
 
             same_pred = cpnet(same_cls)
             same_target = torch.ones(same_pred.shape).float().cuda()
@@ -141,12 +140,16 @@ def train_compnet(HP, DS, train_ds, compnet=None, print_eval=False, save_wt_fnam
         op_schedule.step()
 
         if print_eval and epoch % 5 == 0:
-            print("Training Set Eval: ", eval_compnet(
-                cpnet, train_ds, batch_size=batch_size))
+            print(
+                "Training Set Eval: ",
+                eval_compnet(cpnet, train_ds, batch_size=batch_size),
+            )
 
     if save_wt_fname is not None:
-        torch.save(cpnet.module.state_dict(),
-                   DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname)
+        torch.save(
+            cpnet.module.state_dict(),
+            DS.CLASSIFIER_TRAINED_WEIGHT_DIR + "/" + save_wt_fname,
+        )
     return cpnet
 
 
@@ -155,8 +158,7 @@ def get_compnet_y_test_and_y_score(cpnet, test_ds, batch_size=16):
     Returns y_test, y_score given a NN compnet and the test encoding ds
     """
     cpnet.eval()
-    test_dl = DataLoader(test_ds, batch_size=batch_size,
-                         shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
 
     y_test, y_score = [], []
     for batch_idx, (_, _, _, _, same_cls, diff_cls) in enumerate(test_dl):
@@ -179,8 +181,7 @@ def get_compnet_y_test_and_y_score(cpnet, test_ds, batch_size=16):
 
 def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
     cpnet.eval()
-    test_dl = DataLoader(test_ds, batch_size=batch_size,
-                         shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     loss_fn = nn.BCELoss()
 
     same_total_loss = 0.0
@@ -200,58 +201,61 @@ def eval_compnet(cpnet, test_ds, batch_size=16, pred_threshold=0.5):
         same_loss = loss_fn(same_pred, same_target)
         same_total_loss += same_loss.data.cpu().numpy()
 
-        same_corr_cnt += np.sum(same_pred.detach().cpu().numpy()
-                                > pred_threshold)
-        same_incorr_cnt += np.sum(same_pred.detach().cpu().numpy()
-                                  <= pred_threshold)
+        same_corr_cnt += np.sum(same_pred.detach().cpu().numpy() > pred_threshold)
+        same_incorr_cnt += np.sum(same_pred.detach().cpu().numpy() <= pred_threshold)
 
         diff_pred = cpnet(diff_cls)
         diff_target = torch.zeros(diff_pred.shape).float().cuda()
         diff_loss = loss_fn(diff_pred, diff_target)
         diff_total_loss += diff_loss.data.cpu().numpy()
 
-        diff_corr_cnt += np.sum(diff_pred.detach().cpu().numpy()
-                                < pred_threshold)
-        diff_incorr_cnt += np.sum(diff_pred.detach().cpu().numpy()
-                                  >= pred_threshold)
+        diff_corr_cnt += np.sum(diff_pred.detach().cpu().numpy() < pred_threshold)
+        diff_incorr_cnt += np.sum(diff_pred.detach().cpu().numpy() >= pred_threshold)
 
     precision = same_corr_cnt / (same_corr_cnt + diff_incorr_cnt)
     # same_corr_cnt / len(test_ds)
     recall = same_corr_cnt / (same_corr_cnt + same_incorr_cnt)
     print("------------------ Evaluation Report ------------------")
-    print(f"Total Accuracy: {(same_corr_cnt+diff_corr_cnt)/(2*len(test_ds))}")
+    print(f"Total Accuracy: {(same_corr_cnt + diff_corr_cnt) / (2 * len(test_ds))}")
     print(f"After {batch_cnt} batches and {len(test_ds)} test points")
     print()
 
-    print(f"Metrics for the same class:")
+    print("Metrics for the same class:")
     print(f"Avg loss: {same_total_loss / batch_cnt}")
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
-    print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
+    print(f"F1 Score: {(2 * precision * recall) / (precision + recall)}")
 
     precision = diff_corr_cnt / (diff_corr_cnt + same_incorr_cnt)
     # diff_corr_cnt / len(test_ds)
     recall = diff_corr_cnt / (diff_corr_cnt + diff_incorr_cnt)
     print()
-    print(f"Metrics for the diff class:")
+    print("Metrics for the diff class:")
     print(f"Avg loss: {diff_total_loss / batch_cnt}")
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
-    print(f"F1 Score: {(2*precision*recall)/(precision+recall)}")
+    print(f"F1 Score: {(2 * precision * recall) / (precision + recall)}")
 
     # Get AUC and plot ROC
     y_true, y_score = get_compnet_y_test_and_y_score(cpnet, test_ds)
     fp_rate, tp_rate, _ = roc_curve(y_true, y_score)
-    plot_roc_curve(fp_rate, tp_rate,
-                   title='CompNet Receiver operating characteristic')
+    plot_roc_curve(fp_rate, tp_rate, title="CompNet Receiver operating characteristic")
 
-    return (same_total_loss, diff_total_loss,
-            same_corr_cnt, diff_corr_cnt,
-            same_incorr_cnt, diff_incorr_cnt,
-            batch_cnt, len(test_ds))
+    return (
+        same_total_loss,
+        diff_total_loss,
+        same_corr_cnt,
+        diff_corr_cnt,
+        same_incorr_cnt,
+        diff_incorr_cnt,
+        batch_cnt,
+        len(test_ds),
+    )
 
 
-def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fname='pnet_decoder.pth'):
+def train_decoder(
+    HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fname="pnet_decoder.pth"
+):
     """
     Default training is for 3D point dimensions
 
@@ -277,32 +281,41 @@ def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fnam
     adnet = adnet.cuda()
 
     # encodings for same class transformation
-    same_encoding = torch.nn.Embedding(
-        len(train_ds), encoding_size, max_norm=1.0)
+    same_encoding = torch.nn.Embedding(len(train_ds), encoding_size, max_norm=1.0)
     # init encoding with Kaiming Initialization
-    torch.nn.init.normal_(same_encoding.weight.data,
-                          0.0,
-                          1.0 / math.sqrt(encoding_size))
+    torch.nn.init.normal_(
+        same_encoding.weight.data, 0.0, 1.0 / math.sqrt(encoding_size)
+    )
 
     # encodings for different class transformation
-    diff_encoding = torch.nn.Embedding(
-        len(train_ds), encoding_size, max_norm=1.0)
+    diff_encoding = torch.nn.Embedding(len(train_ds), encoding_size, max_norm=1.0)
     # init encoding with Kaiming Initialization
-    torch.nn.init.normal_(diff_encoding.weight.data,
-                          0.0,
-                          1.0 / math.sqrt(encoding_size))
+    torch.nn.init.normal_(
+        diff_encoding.weight.data, 0.0, 1.0 / math.sqrt(encoding_size)
+    )
 
-    optimizer = torch.optim.Adam([
-        {"params": adnet.parameters(), "lr": lr, },
-        {"params": same_encoding.parameters(), "lr": lr, },
-        {"params": diff_encoding.parameters(), "lr": lr, }, ])
+    optimizer = torch.optim.Adam(
+        [
+            {
+                "params": adnet.parameters(),
+                "lr": lr,
+            },
+            {
+                "params": same_encoding.parameters(),
+                "lr": lr,
+            },
+            {
+                "params": diff_encoding.parameters(),
+                "lr": lr,
+            },
+        ]
+    )
 
     op_schedule = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.5)
     adnet = nn.DataParallel(adnet)
     adnet.cuda()
 
-    data_loader_train = DataLoader(train_ds, batch_size=batch_size,
-                                   shuffle=True)
+    data_loader_train = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 
     for epoch in range(EPOCHS):
         adnet.train()
@@ -312,9 +325,11 @@ def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fnam
         for batch_idx, (x, same, diff, idx) in enumerate(data_loader_train):
             optimizer.zero_grad()
             x, same, diff = x.cuda(), same.cuda(), diff.cuda()
-            x, same, diff = (Variable(x).float(),
-                             Variable(same).float(),
-                             Variable(diff).float())
+            x, same, diff = (
+                Variable(x).float(),
+                Variable(same).float(),
+                Variable(diff).float(),
+            )
             same_pred = adnet(x, same_encoding(torch.LongTensor(idx)))
             loss_cham = chamfer_loss(same, same_pred, ps=same.shape[-1])
             same_total_loss += loss_cham.data.cpu().numpy()
@@ -334,20 +349,30 @@ def train_decoder(HP, DS, train_ds, decoder=None, print_eval=False, save_wt_fnam
         op_schedule.step()
 
         if print_eval and epoch % 5 == 0:
-            print("Training Set Eval: ", eval_decoder(
-                adnet, train_ds, batch_size=batch_size))
+            print(
+                "Training Set Eval: ",
+                eval_decoder(adnet, train_ds, batch_size=batch_size),
+            )
 
     if save_wt_fname is not None:
-        torch.save(adnet.module.state_dict(),
-                   DS.AUTODECODER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname)
+        torch.save(
+            adnet.module.state_dict(),
+            DS.AUTODECODER_TRAINED_WEIGHT_DIR + "/" + save_wt_fname,
+        )
     return adnet
 
 
-def return_decoder_train_test_encoding_ds(X_train, y_train, X_test, y_test,
-                                          adnet_HP, adnet_DS, print_eval=False,
-                                          autodecoder=AutoDecoder(encoding_size=256,
-                                                                  point_dim=3),
-                                          save_wt_fname='mnet_decoder.pth'):
+def return_decoder_train_test_encoding_ds(
+    X_train,
+    y_train,
+    X_test,
+    y_test,
+    adnet_HP,
+    adnet_DS,
+    print_eval=False,
+    autodecoder=AutoDecoder(encoding_size=256, point_dim=3),
+    save_wt_fname="mnet_decoder.pth",
+):
     """
     Trains the decoder by generating the same and different class datasets
     Return Value: autodecoder, train_encoding_ds, test_encoding_ds, train_ds, test_ds
@@ -360,26 +385,26 @@ def return_decoder_train_test_encoding_ds(X_train, y_train, X_test, y_test,
     test_ds = PointDriftDS(X_test, y_test)
 
     # train autodecoder
-    mn_autodecoder = train_decoder(adnet_HP,
-                                   adnet_DS,
-                                   train_ds=train_ds,
-                                   decoder=autodecoder,
-                                   print_eval=print_eval,
-                                   save_wt_fname=save_wt_fname)
+    mn_autodecoder = train_decoder(
+        adnet_HP,
+        adnet_DS,
+        train_ds=train_ds,
+        decoder=autodecoder,
+        print_eval=print_eval,
+        save_wt_fname=save_wt_fname,
+    )
 
     # get the train encodings
-    train_encoding_ds = EncodingDS(PointDriftDS(
-        X_train, y_train), mn_autodecoder)
+    train_encoding_ds = EncodingDS(PointDriftDS(X_train, y_train), mn_autodecoder)
     train_result = train_encoding_ds.train_encodings(
-        find_encoding,
-        num_iterations=15, lr=0.05)
+        find_encoding, num_iterations=15, lr=0.05
+    )
 
     # get the test encodings
-    test_encoding_ds = EncodingDS(PointDriftDS(
-        X_test, y_test), mn_autodecoder)
+    test_encoding_ds = EncodingDS(PointDriftDS(X_test, y_test), mn_autodecoder)
     test_result = test_encoding_ds.train_encodings(
-        find_encoding,
-        num_iterations=15, lr=0.05)
+        find_encoding, num_iterations=15, lr=0.05
+    )
 
     return autodecoder, train_encoding_ds, test_encoding_ds, train_ds, test_ds
 
@@ -387,8 +412,9 @@ def return_decoder_train_test_encoding_ds(X_train, y_train, X_test, y_test,
 def eval_decoder(decoder, eval_ds, batch_size=16):
     decoder.eval()
     encoding_ds = EncodingDS(eval_ds, decoder)
-    return encoding_ds.train_encodings(find_encoding,
-                                       num_iterations=10, lr=0.05, batch_size=batch_size)[2:]
+    return encoding_ds.train_encodings(
+        find_encoding, num_iterations=10, lr=0.05, batch_size=batch_size
+    )[2:]
 
 
 def get_X_y_from_dataloader(data_loader):
@@ -396,8 +422,10 @@ def get_X_y_from_dataloader(data_loader):
     # Combine the entire dataset
     for batch_idx, (_, _, _, _idx, same_cls, diff_cls) in enumerate(data_loader):
         same_cls, diff_cls = same_cls.detach().numpy(), diff_cls.detach().numpy()
-        same_target, diff_target = np.ones(
-            same_cls.shape[0]), np.zeros(diff_cls.shape[0])
+        same_target, diff_target = (
+            np.ones(same_cls.shape[0]),
+            np.zeros(diff_cls.shape[0]),
+        )
 
         if X is None and y is None:
             X = np.concatenate([same_cls, diff_cls], axis=0)
@@ -409,7 +437,9 @@ def get_X_y_from_dataloader(data_loader):
     return X, y
 
 
-def train_rand_forest(HP, DS, train_ds, save_wt_fname='pnet_rand_forest_clf.pkl', **kwargs):
+def train_rand_forest(
+    HP, DS, train_ds, save_wt_fname="pnet_rand_forest_clf.pkl", **kwargs
+):
     """
     Train the Random Forest model
 
@@ -425,29 +455,32 @@ def train_rand_forest(HP, DS, train_ds, save_wt_fname='pnet_rand_forest_clf.pkl'
     n_estimators = HP.n_estimators
     min_samples_split = HP.min_samples_split
 
-    data_loader_train = DataLoader(train_ds, batch_size=16,
-                                   shuffle=True)
+    data_loader_train = DataLoader(train_ds, batch_size=16, shuffle=True)
     X, y = get_X_y_from_dataloader(data_loader_train)
 
-    rand_forest_clf = RandomForestClassifier(max_depth=max_depth,
-                                             criterion=criterion,
-                                             n_estimators=n_estimators,
-                                             random_state=random_state_seed,
-                                             min_samples_split=min_samples_split)
+    rand_forest_clf = RandomForestClassifier(
+        max_depth=max_depth,
+        criterion=criterion,
+        n_estimators=n_estimators,
+        random_state=random_state_seed,
+        min_samples_split=min_samples_split,
+    )
 
     rand_forest_clf.fit(X, y)
     y_pred = rand_forest_clf.predict(X)
 
     print(f"Total Log Loss: {log_loss(y, rand_forest_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(rand_forest_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
-                        compress=9)
+        _ = joblib.dump(
+            rand_forest_clf,
+            DS.CLASSIFIER_TRAINED_WEIGHT_DIR + "/" + save_wt_fname,
+            compress=9,
+        )
     return rand_forest_clf
 
 
 def eval_rand_forest(rand_forest_clf, test_ds, batch_size=16):
-    test_dl = DataLoader(test_ds, batch_size=batch_size,
-                         shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     X, y = get_X_y_from_dataloader(test_dl)
 
     y_pred = rand_forest_clf.predict(X)
@@ -460,22 +493,33 @@ def eval_rand_forest(rand_forest_clf, test_ds, batch_size=16):
 
     total_loss = log_loss(y, rand_forest_clf.predict_proba(X))
 
-    print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
-                        diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    print_model_metrics(
+        total_loss,
+        same_corr_cnt,
+        same_incorr_cnt,
+        diff_corr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
     # Get AUC and plot ROC
     y_true, y_score = y, rand_forest_clf.predict_proba(X)
     fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
-    plot_roc_curve(fp_rate, tp_rate,
-                   title='Random Forest Receiver operating characteristic')
+    plot_roc_curve(
+        fp_rate, tp_rate, title="Random Forest Receiver operating characteristic"
+    )
 
-    return (total_loss,
-            same_corr_cnt, diff_corr_cnt,
-            same_incorr_cnt, diff_incorr_cnt,
-            len(test_ds))
+    return (
+        total_loss,
+        same_corr_cnt,
+        diff_corr_cnt,
+        same_incorr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
 
-def train_log_regr(HP, DS, train_ds, save_wt_fname='pnet_log_regr_clf.pkl', **kwargs):
+def train_log_regr(HP, DS, train_ds, save_wt_fname="pnet_log_regr_clf.pkl", **kwargs):
     """
     Train the Logistic Regression model
 
@@ -485,8 +529,7 @@ def train_log_regr(HP, DS, train_ds, save_wt_fname='pnet_log_regr_clf.pkl', **kw
     HP.batch_size=16
     """
     solver = HP.solver
-    data_loader_train = DataLoader(train_ds, batch_size=16,
-                                   shuffle=True)
+    data_loader_train = DataLoader(train_ds, batch_size=16, shuffle=True)
     X, y = get_X_y_from_dataloader(data_loader_train)
 
     lor_regr_clf = LogisticRegression(random_state=0, solver=solver)
@@ -496,14 +539,16 @@ def train_log_regr(HP, DS, train_ds, save_wt_fname='pnet_log_regr_clf.pkl', **kw
 
     print(f"Total Log Loss: {log_loss(y, lor_regr_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(lor_regr_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
-                        compress=9)
+        _ = joblib.dump(
+            lor_regr_clf,
+            DS.CLASSIFIER_TRAINED_WEIGHT_DIR + "/" + save_wt_fname,
+            compress=9,
+        )
     return lor_regr_clf
 
 
 def eval_log_regr(log_regr_clf, test_ds, batch_size=16):
-    test_dl = DataLoader(test_ds, batch_size=batch_size,
-                         shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     X, y = get_X_y_from_dataloader(test_dl)
 
     y_pred = log_regr_clf.predict(X)
@@ -516,22 +561,35 @@ def eval_log_regr(log_regr_clf, test_ds, batch_size=16):
 
     total_loss = log_loss(y, log_regr_clf.predict_proba(X))
 
-    print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
-                        diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    print_model_metrics(
+        total_loss,
+        same_corr_cnt,
+        same_incorr_cnt,
+        diff_corr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
     # Get AUC and plot ROC
     y_true, y_score = y, log_regr_clf.predict_proba(X)
     fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
     plot_roc_curve(
-        fp_rate, tp_rate, title='Logistic Regression Receiver operating characteristic')
+        fp_rate, tp_rate, title="Logistic Regression Receiver operating characteristic"
+    )
 
-    return (total_loss,
-            same_corr_cnt, diff_corr_cnt,
-            same_incorr_cnt, diff_incorr_cnt,
-            len(test_ds))
+    return (
+        total_loss,
+        same_corr_cnt,
+        diff_corr_cnt,
+        same_incorr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
 
-def train_naive_bayes(HP, DS, train_ds, save_wt_fname='pnet_gaussian_naive_bayes_clf.pkl', **kwargs):
+def train_naive_bayes(
+    HP, DS, train_ds, save_wt_fname="pnet_gaussian_naive_bayes_clf.pkl", **kwargs
+):
     """
     Train the Gaussian Naive Bayes Classifier
 
@@ -542,8 +600,7 @@ def train_naive_bayes(HP, DS, train_ds, save_wt_fname='pnet_gaussian_naive_bayes
     """
     batch_size = HP.batch_size
 
-    data_loader_train = DataLoader(train_ds, batch_size=16,
-                                   shuffle=True)
+    data_loader_train = DataLoader(train_ds, batch_size=16, shuffle=True)
     X, y = get_X_y_from_dataloader(data_loader_train)
 
     gau_nb_clf = GaussianNB()
@@ -551,17 +608,18 @@ def train_naive_bayes(HP, DS, train_ds, save_wt_fname='pnet_gaussian_naive_bayes
     gau_nb_clf.fit(X, y)
     y_pred = gau_nb_clf.predict(X)
 
-    print(
-        f"Total Loss: {log_loss(y, gau_nb_clf.predict_proba(X))}")
+    print(f"Total Loss: {log_loss(y, gau_nb_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(gau_nb_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
-                        compress=9)
+        _ = joblib.dump(
+            gau_nb_clf,
+            DS.CLASSIFIER_TRAINED_WEIGHT_DIR + "/" + save_wt_fname,
+            compress=9,
+        )
     return gau_nb_clf
 
 
 def eval_gaussian_naive_bayes(gau_nb_clf, test_ds, batch_size=16):
-    test_dl = DataLoader(test_ds, batch_size=batch_size,
-                         shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     X, y = get_X_y_from_dataloader(test_dl)
 
     y_pred = gau_nb_clf.predict(X)
@@ -574,22 +632,35 @@ def eval_gaussian_naive_bayes(gau_nb_clf, test_ds, batch_size=16):
 
     total_loss = log_loss(y, gau_nb_clf.predict_proba(X))
 
-    print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
-                        diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    print_model_metrics(
+        total_loss,
+        same_corr_cnt,
+        same_incorr_cnt,
+        diff_corr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
     # Get AUC and plot ROC
     y_true, y_score = y, gau_nb_clf.predict_proba(X)
     fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
-    plot_roc_curve(fp_rate, tp_rate,
-                   title='Naive Bayes Receiver operating characteristic')
+    plot_roc_curve(
+        fp_rate, tp_rate, title="Naive Bayes Receiver operating characteristic"
+    )
 
-    return (total_loss,
-            same_corr_cnt, diff_corr_cnt,
-            same_incorr_cnt, diff_incorr_cnt,
-            len(test_ds))
+    return (
+        total_loss,
+        same_corr_cnt,
+        diff_corr_cnt,
+        same_incorr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
 
-def train_decision_trees(HP, DS, train_ds, save_wt_fname='pnet_decision_trees_clf.pkl', **kwargs):
+def train_decision_trees(
+    HP, DS, train_ds, save_wt_fname="pnet_decision_trees_clf.pkl", **kwargs
+):
     """
     Train the Decision Tree
 
@@ -607,30 +678,32 @@ def train_decision_trees(HP, DS, train_ds, save_wt_fname='pnet_decision_trees_cl
     max_features = HP.max_features
     min_samples_leaf = HP.min_samples_leaf
 
-    data_loader_train = DataLoader(train_ds, batch_size=16,
-                                   shuffle=True)
+    data_loader_train = DataLoader(train_ds, batch_size=16, shuffle=True)
     X, y = get_X_y_from_dataloader(data_loader_train)
 
-    decision_trees_clf = tree.DecisionTreeClassifier(criterion=criterion,
-                                                     min_samples_split=min_samples_split,
-                                                     min_samples_leaf=min_samples_leaf,
-                                                     max_features=max_features,
-                                                     **kwargs)
+    decision_trees_clf = tree.DecisionTreeClassifier(
+        criterion=criterion,
+        min_samples_split=min_samples_split,
+        min_samples_leaf=min_samples_leaf,
+        max_features=max_features,
+        **kwargs,
+    )
 
     decision_trees_clf.fit(X, y)
     y_pred = decision_trees_clf.predict(X)
 
-    print(
-        f"Total Log Loss: {log_loss(y, decision_trees_clf.predict_proba(X))}")
+    print(f"Total Log Loss: {log_loss(y, decision_trees_clf.predict_proba(X))}")
     if save_wt_fname is not None:
-        _ = joblib.dump(decision_trees_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
-                        compress=9)
+        _ = joblib.dump(
+            decision_trees_clf,
+            DS.CLASSIFIER_TRAINED_WEIGHT_DIR + "/" + save_wt_fname,
+            compress=9,
+        )
     return decision_trees_clf
 
 
 def eval_decision_trees(decision_trees_clf, test_ds, batch_size=16):
-    test_dl = DataLoader(test_ds, batch_size=batch_size,
-                         shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     X, y = get_X_y_from_dataloader(test_dl)
 
     y_pred = decision_trees_clf.predict(X)
@@ -643,22 +716,33 @@ def eval_decision_trees(decision_trees_clf, test_ds, batch_size=16):
 
     total_loss = log_loss(y, decision_trees_clf.predict_proba(X))
 
-    print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
-                        diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    print_model_metrics(
+        total_loss,
+        same_corr_cnt,
+        same_incorr_cnt,
+        diff_corr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
     # Get AUC and plot ROC
     y_true, y_score = y, decision_trees_clf.predict_proba(X)
     fp_rate, tp_rate, _ = roc_curve(y_true, y_score[:, 1])
-    plot_roc_curve(fp_rate, tp_rate,
-                   title='Decision Trees Receiver operating characteristic')
+    plot_roc_curve(
+        fp_rate, tp_rate, title="Decision Trees Receiver operating characteristic"
+    )
 
-    return (total_loss,
-            same_corr_cnt, diff_corr_cnt,
-            same_incorr_cnt, diff_incorr_cnt,
-            len(test_ds))
+    return (
+        total_loss,
+        same_corr_cnt,
+        diff_corr_cnt,
+        same_incorr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
 
-def train_svm(HP, DS, train_ds, save_wt_fname='pnet_svm_clf.pkl'):
+def train_svm(HP, DS, train_ds, save_wt_fname="pnet_svm_clf.pkl"):
     """
     Train the SVM
 
@@ -666,11 +750,10 @@ def train_svm(HP, DS, train_ds, save_wt_fname='pnet_svm_clf.pkl'):
     batch_size=16
     """
     batch_size = HP.batch_size
-    data_loader_train = DataLoader(train_ds, batch_size=16,
-                                   shuffle=True)
+    data_loader_train = DataLoader(train_ds, batch_size=16, shuffle=True)
     X, y = get_X_y_from_dataloader(data_loader_train)
 
-    sgd_clf = SGDClassifier(loss='hinge', penalty='l2')
+    sgd_clf = SGDClassifier(loss="hinge", penalty="l2")
 
     """
     Note:
@@ -684,14 +767,14 @@ def train_svm(HP, DS, train_ds, save_wt_fname='pnet_svm_clf.pkl'):
 
     print(f"Total Hinge Loss: {hinge_loss(y, y_pred)}")
     if save_wt_fname is not None:
-        _ = joblib.dump(sgd_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + '/' + save_wt_fname,
-                        compress=9)
+        _ = joblib.dump(
+            sgd_clf, DS.CLASSIFIER_TRAINED_WEIGHT_DIR + "/" + save_wt_fname, compress=9
+        )
     return sgd_clf
 
 
 def eval_svm(svm_clf, test_ds, batch_size=16):
-    test_dl = DataLoader(test_ds, batch_size=batch_size,
-                         shuffle=False)
+    test_dl = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     X, y = get_X_y_from_dataloader(test_dl)
 
     """
@@ -710,10 +793,20 @@ def eval_svm(svm_clf, test_ds, batch_size=16):
     diff_incorr_cnt = np.sum((y ^ 1) & y_pred)
 
     total_loss = hinge_loss(y, y_pred)
-    print_model_metrics(total_loss, same_corr_cnt, same_incorr_cnt,
-                        diff_corr_cnt, diff_incorr_cnt, len(test_ds))
+    print_model_metrics(
+        total_loss,
+        same_corr_cnt,
+        same_incorr_cnt,
+        diff_corr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )
 
-    return (total_loss,
-            same_corr_cnt, diff_corr_cnt,
-            same_incorr_cnt, diff_incorr_cnt,
-            len(test_ds))
+    return (
+        total_loss,
+        same_corr_cnt,
+        diff_corr_cnt,
+        same_incorr_cnt,
+        diff_incorr_cnt,
+        len(test_ds),
+    )

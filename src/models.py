@@ -1,12 +1,8 @@
 # Torch
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-import torch.backends.cudnn as cudnn
 
-from torch.autograd import Variable
-from torch.utils.data import Dataset, DataLoader
 
 
 class AutoDecoder(nn.Module):
@@ -14,7 +10,7 @@ class AutoDecoder(nn.Module):
     AutoDecoder NN to learn point drift (latent encoding) between two 3D shapes
     """
 
-    def __init__(self,  encoding_size=256, point_dim=3):
+    def __init__(self, encoding_size=256, point_dim=3):
         super(AutoDecoder, self).__init__()
         self.fc1 = nn.Conv1d(encoding_size + point_dim, 128, 1)
         self.fc2 = nn.Conv1d(128, 64, 1)
@@ -85,7 +81,14 @@ class EnsembleCompNet(nn.Module):
     Stacked Ensemble
     """
 
-    def __init__(self, comp_net=CompNet, num_ensemble=5, encoding_dim=256, seed_val=17 * 19, use_cuda=True):
+    def __init__(
+        self,
+        comp_net=CompNet,
+        num_ensemble=5,
+        encoding_dim=256,
+        seed_val=17 * 19,
+        use_cuda=True,
+    ):
         """
         if comp_net is a module, EnsembleCompNet creates num_ensemble*comp_net NN modules
         if comp_net is a list of modules, EnsembleCompNet iterates through comp_net to get the NN modules
@@ -96,7 +99,8 @@ class EnsembleCompNet(nn.Module):
         if isinstance(comp_net, list):
             if num_ensemble != len(comp_net):
                 raise IndexError(
-                    f"Length of comp_nets: {len(comp_net)} and num_ensemble: {num_ensemble} do not match")
+                    f"Length of comp_nets: {len(comp_net)} and num_ensemble: {num_ensemble} do not match"
+                )
             comp_net_list = comp_net
             for i in range(num_ensemble):
                 self.ensemble_compnet.append(comp_net_list[i])
@@ -109,9 +113,8 @@ class EnsembleCompNet(nn.Module):
         self.final = nn.Linear(num_ensemble, 1)
 
     def forward(self, encoding):
-        """ Returns the final value of the results after a nn.Linear layer """
-        total_pred = torch.cat([net(encoding)
-                                for net in self.ensemble_compnet])
+        """Returns the final value of the results after a nn.Linear layer"""
+        total_pred = torch.cat([net(encoding) for net in self.ensemble_compnet])
         total_pred = total_pred.reshape(-1, len(self.ensemble_compnet))
 
         return torch.sigmoid(self.final(total_pred))
